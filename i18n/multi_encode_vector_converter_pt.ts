@@ -203,6 +203,11 @@ as informações já perdidas por limites de formato legado ou conversões irrev
         <translation>Visualização: (sem amostra CSV disponível)</translation>
     </message>
     <message>
+        <location filename="../multi_encode_vector_converter_dockwidget.py" line="724"/>
+        <source>Preview: (ASCII only — encoding not critical)</source>
+        <translation>Visualização: (somente ASCII — codificação não crítica)</translation>
+    </message>
+    <message>
         <location filename="../multi_encode_vector_converter_dockwidget.py" line="692"/>
         <source>Preview: (no sample available)</source>
         <translation>Visualização: (sem amostra disponível)</translation>

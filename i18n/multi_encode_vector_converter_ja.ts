@@ -203,6 +203,10 @@ GPKG処理は一時的な緩和措置であり、
         <translation>プレビュー: (CSVサンプルなし)</translation>
     </message>
     <message>
+        <source>Preview: (ASCII only — encoding not critical)</source>
+        <translation>プレビュー: (ASCII文字のみ — エンコード指定不要)</translation>
+    </message>
+    <message>
         <location filename="../multi_encode_vector_converter_dockwidget.py" line="692"/>
         <source>Preview: (no sample available)</source>
         <translation>プレビュー: (サンプルなし)</translation>

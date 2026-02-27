@@ -715,22 +715,26 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
             self.lbl_csv_enc_preview.setText(
                 self.tr("Preview: {}").format("  /  ".join(values))
             )
-        else:
+        elif values is None:
             self.lbl_csv_enc_preview.setText(
                 self.tr("Preview: (no CSV sample available)")
             )
+        else:
+            self.lbl_csv_enc_preview.setText(
+                self.tr("Preview: (ASCII only — encoding not critical)")
+            )
 
     def _get_csv_preview_values(self, codec):
-        """Return up to 3 non-numeric string values from the CSV source."""
+        """Return up to 3 non-ASCII string values, [] if all-ASCII, None if no data."""
         if self.rb_layer_csv.isChecked():
             csv_path = self.le_csv_path.text().strip()
             if csv_path and os.path.isfile(csv_path):
                 return self._read_csv_sample(csv_path, codec)
-            return []
+            return None
         if self.rb_layer.isChecked():
             layer = self._get_selected_layer()
             if layer is None or not isinstance(layer, QgsVectorLayer):
-                return []
+                return None
             for join_info in layer.vectorJoins():
                 join_layer = QgsProject.instance().mapLayer(join_info.joinLayerId())
                 if join_layer is None:
@@ -738,11 +742,17 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
                 join_path = self._extract_join_source_path(join_layer.source())
                 if join_path:
                     return self._read_csv_sample(join_path, codec)
-        return []
+        return None
 
     @classmethod
     def _read_csv_sample(cls, csv_path, codec):
-        """Read CSV headers and first rows, return up to 3 non-numeric string values."""
+        """Read CSV headers and first rows, return up to 3 non-ASCII string values.
+
+        Returns:
+            list of non-ASCII values  — non-ASCII content found
+            []                        — data exists but all ASCII-only
+            None                      — no readable string data
+        """
         enc = codec or "utf-8"
         try:
             with open(csv_path, "r", encoding=enc, errors="replace") as f:
@@ -756,9 +766,13 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
                     rows.append(row)
             values = []
             seen = set()
+            has_any_string = False
             for h in headers:
                 h = h.strip()
-                if not h or cls._is_numeric_value(h) or h in seen:
+                if not h:
+                    continue
+                has_any_string = True
+                if cls._is_ascii_only(h) or h in seen:
                     continue
                 seen.add(h)
                 values.append(h)
@@ -767,15 +781,20 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
             for row in rows:
                 for val in row:
                     val = val.strip()
-                    if not val or cls._is_numeric_value(val) or val in seen:
+                    if not val:
+                        continue
+                    has_any_string = True
+                    if cls._is_ascii_only(val) or val in seen:
                         continue
                     seen.add(val)
                     values.append(val)
                     if len(values) >= 3:
                         return values
-            return values
+            if values:
+                return values
+            return [] if has_any_string else None
         except Exception:
-            return []
+            return None
 
     # ── Layer encoding preview ─────────────────────────────────────────
 
@@ -787,17 +806,21 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
             self.lbl_enc_preview.setText(
                 self.tr("Preview: {}").format("  /  ".join(values))
             )
-        else:
+        elif values is None:
             self.lbl_enc_preview.setText(
                 self.tr("Preview: (no sample available)")
             )
+        else:
+            self.lbl_enc_preview.setText(
+                self.tr("Preview: (ASCII only — encoding not critical)")
+            )
 
     def _get_preview_values(self, codec):
-        """Return up to 3 non-empty string attribute values for the current source."""
+        """Return up to 3 non-ASCII string values, [] if all-ASCII, None if no data."""
         if self.rb_shp.isChecked():
             shp_path = self.le_shp_path.text().strip()
             if not shp_path or not os.path.isfile(shp_path):
-                return []
+                return None
             return self._read_shp_sample(shp_path, codec)
         layer = (
             self._get_selected_layer()
@@ -805,7 +828,7 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
             else self._get_selected_layer_csv()
         )
         if layer is None or not isinstance(layer, QgsVectorLayer):
-            return []
+            return None
         # For SHP-backed layers, re-read raw file so encoding selection takes effect
         source_path = layer.source().split("|")[0].strip()
         if source_path.lower().endswith(".shp") and os.path.isfile(source_path):
@@ -814,26 +837,27 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
         return self._read_layer_sample(layer)
 
     @staticmethod
-    def _is_numeric_value(s):
-        """Return True if s is a purely numeric string (int, float, comma-separated)."""
-        cleaned = s.replace(",", "").replace(" ", "")
-        try:
-            float(cleaned)
-            return True
-        except ValueError:
-            return False
+    def _is_ascii_only(s):
+        """Return True if s contains only ASCII characters (uninformative for encoding detection)."""
+        return all(ord(c) < 128 for c in s)
 
     @classmethod
     def _read_shp_sample(cls, shp_path, codec):
-        """Read DBF sidecar directly and decode string values with the specified codec."""
+        """Read DBF sidecar directly and decode string values with the specified codec.
+
+        Returns:
+            list of non-ASCII values  — non-ASCII content found
+            []                        — data exists but all ASCII-only
+            None                      — no readable string data
+        """
         dbf_path = os.path.splitext(shp_path)[0] + ".dbf"
         if not os.path.isfile(dbf_path):
-            return []
+            return None
         try:
             with open(dbf_path, "rb") as f:
                 hdr = f.read(32)
                 if len(hdr) < 32:
-                    return []
+                    return None
                 record_count = int.from_bytes(hdr[4:8], "little")
                 header_size = int.from_bytes(hdr[8:10], "little")
                 record_size = int.from_bytes(hdr[10:12], "little")
@@ -843,9 +867,11 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
 
                 # Collect string (type "C") field positions/lengths and field names
                 string_fields = []
-                field_names = []
+                has_any_string = False
                 rec_offset = 1  # byte 0 is deletion flag
                 f.seek(32)
+                values = []
+                seen = set()
                 for _ in range(n_fields):
                     desc = f.read(32)
                     if len(desc) < 32 or desc[0] == 0x0D:
@@ -857,26 +883,21 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
                         name = name_raw.decode(enc, errors="replace").strip()
                     except LookupError:
                         name = name_raw.decode("utf-8", errors="replace").strip()
-                    if name and not cls._is_numeric_value(name):
-                        field_names.append(name)
+                    if name:
+                        has_any_string = True
+                        if not cls._is_ascii_only(name) and name not in seen:
+                            seen.add(name)
+                            values.append(name)
+                            if len(values) >= 3:
+                                return values
                     if ftype == "C":
                         string_fields.append((rec_offset, flen))
                     rec_offset += flen
 
-                values = []
-                seen = set()
-
-                # Seed with field names first
-                for name in field_names:
-                    if name in seen:
-                        continue
-                    seen.add(name)
-                    values.append(name)
-                    if len(values) >= 3:
-                        return values
-
                 if not string_fields:
-                    return values
+                    if values:
+                        return values
+                    return [] if has_any_string else None
 
                 f.seek(header_size)
                 for _ in range(min(record_count, 20)):
@@ -891,28 +912,41 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
                             val = raw.decode(enc, errors="replace").strip()
                         except LookupError:
                             val = raw.decode("utf-8", errors="replace").strip()
-                        if not val or cls._is_numeric_value(val):
+                        if not val:
                             continue
-                        if val in seen:
+                        has_any_string = True
+                        if cls._is_ascii_only(val) or val in seen:
                             continue
                         seen.add(val)
                         values.append(val)
                         if len(values) >= 3:
                             return values
-            return values
+            if values:
+                return values
+            return [] if has_any_string else None
         except Exception:
-            return []
+            return None
 
     @classmethod
     def _read_layer_sample(cls, layer):
-        """Scan field names then up to 20 features for 3 non-numeric string values."""
+        """Scan field names then up to 20 features for 3 non-ASCII string values.
+
+        Returns:
+            list of non-ASCII values  — non-ASCII content found
+            []                        — data exists but all ASCII-only
+            None                      — no readable string data
+        """
         try:
             values = []
             seen = set()
+            has_any_string = False
             # Seed with field names first
             for field in layer.fields():
                 name = field.name().strip()
-                if not name or cls._is_numeric_value(name) or name in seen:
+                if not name:
+                    continue
+                has_any_string = True
+                if cls._is_ascii_only(name) or name in seen:
                     continue
                 seen.add(name)
                 values.append(name)
@@ -925,15 +959,18 @@ class MultiEncodeVectorConverterDockWidget(QtWidgets.QDockWidget):
                     if not (isinstance(val, str) and val.strip()):
                         continue
                     stripped = val.strip()
-                    if stripped in seen or cls._is_numeric_value(stripped):
+                    has_any_string = True
+                    if cls._is_ascii_only(stripped) or stripped in seen:
                         continue
                     seen.add(stripped)
                     values.append(stripped)
                     if len(values) >= 3:
                         return values
-            return values
+            if values:
+                return values
+            return [] if has_any_string else None
         except Exception:
-            return []
+            return None
 
     # ── Field population ──────────────────────────────────────────────
 

@@ -203,6 +203,11 @@ la información ya perdida por límites de formatos heredados o conversiones irr
         <translation>Vista previa: (sin muestra CSV disponible)</translation>
     </message>
     <message>
+        <location filename="../multi_encode_vector_converter_dockwidget.py" line="724"/>
+        <source>Preview: (ASCII only — encoding not critical)</source>
+        <translation>Vista previa: (solo ASCII — codificación no crítica)</translation>
+    </message>
+    <message>
         <location filename="../multi_encode_vector_converter_dockwidget.py" line="692"/>
         <source>Preview: (no sample available)</source>
         <translation>Vista previa: (sin muestra disponible)</translation>
