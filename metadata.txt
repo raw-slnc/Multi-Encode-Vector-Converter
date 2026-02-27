@@ -1,6 +1,6 @@
 [general]
 name=Multi-Encode Vector Converter
-qgisMinimumVersion=3.0
+qgisMinimumVersion=3.20
 description=Solves character encoding issues (mojibake) when converting vector data to GeoPackage.
 description[ja]=ベクタデータをGeoPackageに変換する際の文字化け問題を解決し、安全に統合します。
 description[es]=Resuelve problemas de codificación de caracteres al convertir datos vectoriales a GeoPackage.
